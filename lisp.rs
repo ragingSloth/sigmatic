@@ -93,6 +93,53 @@ fn expand_lisp(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult 
     MacExpr::new(cx.expr_uint(sp, 8u))
 }
 
+pub trait Lisp
+{
+    fn parse(&self);
+}
+
+impl Lisp for TtDelimited{
+    fn parse(&self){
+        match *self{
+            TtDelimited(_, y) = {
+                match y.delim{
+                    token::DelimToken::Paren => return Some(St(y.parse())),
+                    _ => None,
+                }
+            },
+        }
+    }
+}
+
+impl Lisp for Delimited{
+    fn parse(&self){
+    let mut LL = vec![];
+        loop{
+            match *self.tts.pop(){
+                TtToken(_, t) => LL.push(box E(t)),
+                TtDelimited(_) => return box *self.tts.parse(),
+                _ => panic!("shit"),
+            }
+        }
+    }
+}
+
+#[deriving (Show, Clone)]
+enum Tree<'a>{
+    E(token::Token<'a>),
+    St(Vec<Box<Tree<'a>>>),
+}
+
+//#[deriving (Show, Clone)]
+//enum Expr<'a>{
+//    Symbol(String),
+//}
+//#[deriving (Show, Clone)]
+//enum Branch<'a>{
+//    E(Expr<'a>),
+//    B(Vec<Box<Branch<'a>>>),
+//}
+
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
     reg.register_macro("lisp", expand_lisp);
