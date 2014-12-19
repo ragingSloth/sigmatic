@@ -18,127 +18,62 @@ use rustc::plugin::Registry;
 use std::os;
 use std::num::{Num};
 use std::io::File;
-use Expr::*;
-use Branch::*;
+use Tree::*;
 
-#[deriving (Show, Clone)]
-enum Expr<'a>{
-    Symbol(String),
-}
-
-#[deriving (Show, Clone)]
-enum Branch<'a>{
-    E(Expr<'a>),
-    B(Vec<Box<Branch<'a>>>),
-}
-
-fn parse<'a>(ts: &mut Vec<String>) -> Branch<'a>{
-    let mut tree = vec![];
-    let mut first = true;
-    loop{
-        match ts.pop(){
-            Some(t) => {
-                match t.as_slice(){
-                    "(" => {
-                            if first {
-                                first = false;
-                            }
-                            else{ 
-                                tree.push(box parse(ts));
-                            }
-                        },
-                    ")" => break,// B(tree),
-                    "" => continue,
-                    x => tree.push(box E(Symbol(String::from_str(x)))),
-                }
-            },
-            None => break,
-        }
-    }
-    return B(tree);
-}
-
-fn tokenize(fp: &str) -> Vec<String>{
-    let data = match File::open(&Path::new(fp)).read_to_string(){
-        Ok(n) => n,
-        Err(er) => panic!("couldn't read file: {}", er.desc)
-    };
-    let broken = data.replace("(", " ( ").replace(")", " ) ").replace("  ", " ");
-    let mut tokens = vec![];
-    
-    for t in broken.as_slice().split_str(" ").filter(|&x| *x != *"\n"){
-        tokens.push(String::from_str(t));
-    }
-    return tokens
-}
-
-
-fn expand_lisp(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
-    println!("{}", args);
-    let mut n = vec![args];
-    println!("{}", n.pop());
-    let text = match args {
-            [TtDelimited(_, ref y)] => {
-                match y.delim{
-                   token::DelimToken::Paren => "(",
-                    _=> "Error"
-                }
-            }
-        _ => {
-            cx.span_err(sp, "gotta ident bro");
-            return DummyResult::any(sp);
-        }
-    };
-    println!("{}", text);
-    MacExpr::new(cx.expr_uint(sp, 8u))
-}
 
 pub trait Lisp
 {
-    fn parse(&self);
+    fn parse(&mut self) -> Tree;
 }
 
-impl Lisp for TtDelimited{
-    fn parse(&self){
-        match *self{
-            TtDelimited(_, y) = {
-                match y.delim{
-                    token::DelimToken::Paren => return Some(St(y.parse())),
-                    _ => None,
+impl Lisp for TokenTree{
+    fn parse(&mut self) -> Tree{ 
+        match self.clone(){
+            TtDelimited(_, y) => {
+                let mut y2 = box () (*y).clone();
+                match y2.delim{
+                    token::DelimToken::Paren => y2.parse(),
+                    _ => panic!("not done yet"),
                 }
             },
+            TtToken(_, t) => E(t),
+            _ => panic!("not done yet"),
         }
     }
 }
 
 impl Lisp for Delimited{
-    fn parse(&self){
-    let mut LL = vec![];
+    fn parse(&mut self) -> Tree{
+        let mut LL = vec![];
         loop{
-            match *self.tts.pop(){
-                TtToken(_, t) => LL.push(box E(t)),
-                TtDelimited(_) => return box *self.tts.parse(),
-                _ => panic!("shit"),
-            }
+            match self.tts.pop(){
+                Some(x) => {
+                    LL.push(box x.parse().clone());
+                    },
+                None => break,
+            };
         }
+        return St(LL)
     }
 }
 
 #[deriving (Show, Clone)]
-enum Tree<'a>{
-    E(token::Token<'a>),
+pub enum Tree<'a>{
+    E(token::Token),
     St(Vec<Box<Tree<'a>>>),
 }
 
-//#[deriving (Show, Clone)]
-//enum Expr<'a>{
-//    Symbol(String),
-//}
-//#[deriving (Show, Clone)]
-//enum Branch<'a>{
-//    E(Expr<'a>),
-//    B(Vec<Box<Branch<'a>>>),
-//}
+fn expand_lisp(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
+    //println!("{}", args);
+    //let mut n = vec![args];
+   // println!("{}", n.pop());
+    let text = match args[0] {
+        TtDelimited(_, _) => (*args)[0].parse(),
+        _ => panic!("that's not lisp"),
+    };
+    println!("{}", text);
+    MacExpr::new(cx.expr_uint(sp, 8u))
+}
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
