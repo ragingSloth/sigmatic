@@ -23,32 +23,32 @@ use Tree::*;
 
 pub trait Lisp
 {
-    fn parse(&mut self) -> Tree;
+    fn parse<'a>(&'a mut self) -> Tree<'a>;
 }
 
 impl Lisp for TokenTree{
-    fn parse(&mut self) -> Tree{ 
-        match self.clone(){
-            TtDelimited(_, y) => {
-                let mut y2 = box () (*y).clone();
-                match y2.delim{
-                    token::DelimToken::Paren => y2.parse(),
+    fn parse<'a>(&'a mut self) -> Tree<'a>{ 
+        match *self{
+            TtDelimited(_, ref mut y) => {
+                match y.delim{
+                    token::DelimToken::Paren => return y.parse(),
                     _ => panic!("not done yet"),
                 }
             },
-            TtToken(_, t) => E(t),
+            TtToken(_, ref mut t) => return E(t.clone()),
             _ => panic!("not done yet"),
         }
     }
 }
 
 impl Lisp for Delimited{
-    fn parse(&mut self) -> Tree{
+    fn parse<'a>(&'a mut self) -> Tree<'a>{
         let mut LL = vec![];
         loop{
             match self.tts.pop(){
-                Some(x) => {
-                    LL.push(box x.parse().clone());
+                Some(ref mut x) => {
+                    let temp = box x.parse().clone();
+                    LL.push(temp);
                     },
                 None => break,
             };
