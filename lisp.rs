@@ -35,7 +35,7 @@ impl Lisp for TokenTree{
                     _ => panic!("not done yet"),
                 }
             },
-            TtToken(_, ref mut t) => return E(t.clone()),
+            TtToken(_, ref mut t) => return E(box t.clone()),
             _ => panic!("not done yet"),
         }
     }
@@ -47,20 +47,20 @@ impl Lisp for Delimited{
         loop{
             match self.tts.pop(){
                 Some(ref mut x) => {
-                    let temp = box x.parse().clone();
+                    let temp = x.parse().clone();
                     LL.push(temp);
                     },
                 None => break,
             };
         }
-        return St(LL)
+       return St(LL);
     }
 }
 
 #[deriving (Show, Clone)]
 pub enum Tree<'a>{
-    E(token::Token),
-    St(Vec<Box<Tree<'a>>>),
+    E(Box<token::Token>),
+    St(Vec<Tree<'a>>),
 }
 
 fn expand_lisp(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
